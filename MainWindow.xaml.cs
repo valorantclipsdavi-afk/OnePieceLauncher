@@ -6,12 +6,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Drawing;
+using System.Windows;
+using System.Windows.Input;
 
-namespace OnePieceLauncher
+namespace OnePieceLauncherWPF
 {
-    public partial class Form1 : Form
+    public partial class MainWindow : Window
     {
         // ==========================================
         // CONFIGURAÇÕES DO JOGO - MUDE AQUI!
@@ -20,14 +20,10 @@ namespace OnePieceLauncher
         private const string GitHubRepo = "OnePieceGame";
         private const string GitHubLauncherRepo = "OnePieceLauncher";
         private const string GameExecutableName = "OnePieceGame.exe";
-        
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.243");
+        private static readonly Version CurrentLauncherVersion = new Version("1.0.0-0626-1"); // Start fresh with 1.0.0 for WPF
 
-        private Label lblStatus;
-        private ProgressBar progressBar;
-        private Button btnPlay;
         private string githubApiUrl => $"https://api.github.com/repos/{GitHubUser}/{GitHubRepo}/releases/latest";
         private string githubLauncherApiUrl => $"https://api.github.com/repos/{GitHubUser}/{GitHubLauncherRepo}/releases/latest";
 
@@ -36,12 +32,12 @@ namespace OnePieceLauncher
         private string zipFilePath;
         private string gameExecutablePath;
         private string usernameFilePath;
-        
-        private TextBox txtUsername;
+        private string genderFilePath;
 
-        public Form1()
+        public MainWindow()
         {
-            InitializeUI();
+            InitializeComponent();
+            lblVersion.Text = $"v{CurrentLauncherVersion.ToString(3)}";
             SetupPaths();
             _ = CheckForUpdatesAsync();
         }
@@ -55,6 +51,18 @@ namespace OnePieceLauncher
             zipFilePath = Path.Combine(baseFolder, "update.zip");
             gameExecutablePath = Path.Combine(gameFolderPath, GameExecutableName);
             usernameFilePath = Path.Combine(baseFolder, "username.txt");
+            genderFilePath = Path.Combine(baseFolder, "gender.txt");
+
+            if (File.Exists(usernameFilePath))
+            {
+                txtUsername.Text = File.ReadAllText(usernameFilePath).Trim();
+            }
+            if (File.Exists(genderFilePath))
+            {
+                string gender = File.ReadAllText(genderFilePath).Trim().ToLower();
+                if (gender == "female") rbFemale.IsChecked = true;
+                else rbMale.IsChecked = true;
+            }
 
             // Tenta deletar atualizador antigo se existir
             string oldBatch = Path.Combine(baseFolder, "update_launcher.bat");
@@ -64,76 +72,28 @@ namespace OnePieceLauncher
             }
         }
 
-        private void InitializeUI()
+        // --- Window Chrome Controls ---
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            this.Text = $"One Piece - Atualizador (v{CurrentLauncherVersion.ToString(3)})";
-            this.Size = new Size(400, 200);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-
-            lblStatus = new Label
-            {
-                Text = "Verificando atualizações...",
-                Location = new Point(20, 20),
-                AutoSize = true,
-                Font = new Font("Arial", 10, FontStyle.Regular)
-            };
-
-            progressBar = new ProgressBar
-            {
-                Location = new Point(20, 60),
-                Size = new Size(340, 25),
-                Style = ProgressBarStyle.Continuous
-            };
-
-            Label lblUser = new Label
-            {
-                Text = "Nome:",
-                Location = new Point(20, 118),
-                AutoSize = true,
-                Font = new Font("Arial", 10, FontStyle.Regular)
-            };
-
-            txtUsername = new TextBox
-            {
-                Location = new Point(70, 115),
-                Size = new Size(130, 25),
-                Font = new Font("Arial", 10, FontStyle.Regular)
-            };
-
-            if (File.Exists(usernameFilePath))
-            {
-                txtUsername.Text = File.ReadAllText(usernameFilePath).Trim();
-            }
-
-            btnPlay = new Button
-            {
-                Text = "Jogar",
-                Location = new Point(210, 110),
-                Size = new Size(100, 35),
-                Enabled = false,
-                Font = new Font("Arial", 10, FontStyle.Bold)
-            };
-            btnPlay.Click += BtnPlay_Click;
-
-            this.Controls.Add(lblStatus);
-            this.Controls.Add(progressBar);
-            this.Controls.Add(lblUser);
-            this.Controls.Add(txtUsername);
-            this.Controls.Add(btnPlay);
+            if (e.ButtonState == MouseButtonState.Pressed)
+                DragMove();
         }
 
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        // --- Update Logic ---
         private async Task CheckForUpdatesAsync()
         {
             try
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    // GitHub requer User-Agent
-                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OnePieceLauncher", "1.0"));
+                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OnePieceLauncher", "2.0"));
 
-                    // 1. Verificar se há atualização para o Launcher em seu repositório dedicado
+                    // 1. Verificar se há atualização para o Launcher
                     try
                     {
                         HttpResponseMessage launcherResponse = await client.GetAsync(githubLauncherApiUrl);
@@ -158,7 +118,7 @@ namespace OnePieceLauncher
                                         if (!string.IsNullOrEmpty(launcherDownloadUrl))
                                         {
                                             await UpdateLauncherAsync(launcherDownloadUrl, latestLauncherVersion.ToString(3), client);
-                                            return; // Retorna para reiniciar o Launcher
+                                            return; 
                                         }
                                     }
                                 }
@@ -167,7 +127,6 @@ namespace OnePieceLauncher
                     }
                     catch (Exception ex)
                     {
-                        // Falha ao checar atualização do launcher não deve impedir o jogo de rodar
                         Console.WriteLine("Erro ao verificar atualização do launcher: " + ex.Message);
                     }
 
@@ -240,7 +199,6 @@ namespace OnePieceLauncher
                 string launcherZipPath = Path.Combine(baseFolder, "launcher_update.zip");
                 string launcherTempPath = Path.Combine(baseFolder, "launcher_temp");
 
-                // Baixar atualização do launcher
                 using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
                 {
                     response.EnsureSuccessStatusCode();
@@ -261,7 +219,7 @@ namespace OnePieceLauncher
                             if (totalBytes.HasValue)
                             {
                                 int percentage = (int)((double)totalRead / totalBytes.Value * 100);
-                                progressBar.Invoke((MethodInvoker)(() => progressBar.Value = percentage));
+                                Dispatcher.Invoke(() => progressBar.Value = percentage);
                             }
                         }
                     }
@@ -275,7 +233,6 @@ namespace OnePieceLauncher
                     ZipFile.ExtractToDirectory(launcherZipPath, launcherTempPath);
                 });
 
-                // Criar script batch para substituir arquivos após fechar
                 string batchPath = Path.Combine(baseFolder, "update_launcher.bat");
                 string exeName = Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName);
 
@@ -292,7 +249,6 @@ del ""%~f0""
 ";
                 File.WriteAllText(batchPath, batchContent);
 
-                // Executar o script em background de forma silenciosa
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = batchPath,
@@ -302,7 +258,7 @@ del ""%~f0""
                 };
                 Process.Start(startInfo);
 
-                Application.Exit();
+                Application.Current.Shutdown();
             }
             catch (Exception ex)
             {
@@ -343,7 +299,7 @@ del ""%~f0""
                             if (totalBytes.HasValue)
                             {
                                 int percentage = (int)((double)totalRead / totalBytes.Value * 100);
-                                progressBar.Invoke((MethodInvoker)(() => progressBar.Value = percentage));
+                                Dispatcher.Invoke(() => progressBar.Value = percentage);
                             }
                         }
                     }
@@ -358,7 +314,6 @@ del ""%~f0""
                         Directory.CreateDirectory(gameFolderPath);
                     }
                     
-                    // Extração manual robusta (renomeia arquivos travados)
                     using (ZipArchive archive = ZipFile.OpenRead(zipFilePath))
                     {
                         foreach (ZipArchiveEntry entry in archive.Entries)
@@ -388,10 +343,7 @@ del ""%~f0""
                     }
                 });
 
-                // Deleta o ZIP
                 File.Delete(zipFilePath);
-
-                // Atualiza a versão
                 File.WriteAllText(versionFilePath, newVersion);
 
                 lblStatus.Text = "Atualização concluída!";
@@ -406,15 +358,10 @@ del ""%~f0""
 
         private void EnablePlayButton()
         {
-            if (this.InvokeRequired)
-            {
-                this.Invoke((MethodInvoker)EnablePlayButton);
-                return;
-            }
-            btnPlay.Enabled = true;
+            Dispatcher.Invoke(() => btnPlay.IsEnabled = true);
         }
 
-        private void BtnPlay_Click(object sender, EventArgs e)
+        private void BtnPlay_Click(object sender, RoutedEventArgs e)
         {
             string username = txtUsername.Text.Trim();
             if (string.IsNullOrEmpty(username))
@@ -424,7 +371,10 @@ del ""%~f0""
             }
             File.WriteAllText(usernameFilePath, username);
 
-            string args = $"-username \"{username}\"";
+            string gender = rbFemale.IsChecked == true ? "female" : "male";
+            File.WriteAllText(genderFilePath, gender);
+
+            string args = $"-username \"{username}\" -gender {gender}";
 
             if (File.Exists(gameExecutablePath))
             {
@@ -435,11 +385,10 @@ del ""%~f0""
                     WorkingDirectory = gameFolderPath,
                     UseShellExecute = true
                 });
-                Application.Exit();
+                Application.Current.Shutdown();
             }
             else
             {
-                // Tenta encontrar o executável nas subpastas caso o zip tenha vindo com uma pasta raiz
                 string[] possiblePaths = Directory.GetFiles(gameFolderPath, GameExecutableName, SearchOption.AllDirectories);
                 if (possiblePaths.Length > 0)
                 {
@@ -451,11 +400,11 @@ del ""%~f0""
                         WorkingDirectory = Path.GetDirectoryName(actualExePath),
                         UseShellExecute = true
                     });
-                    Application.Exit();
+                    Application.Current.Shutdown();
                 }
                 else
                 {
-                    MessageBox.Show("Arquivo do jogo não encontrado em:\n" + gameExecutablePath, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Arquivo do jogo não encontrado em:\n" + gameExecutablePath, "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -464,7 +413,6 @@ del ""%~f0""
         {
             if (!Directory.Exists(path)) return;
 
-            // 1. Tenta fechar processos do jogo e do Unity Crash Handler que travam as DLLs
             try
             {
                 string[] processesToKill = {
@@ -488,7 +436,6 @@ del ""%~f0""
             }
             catch { }
 
-            // 2. Remove atributos de Somente Leitura (Read-Only) de arquivos e subpastas recursivamente
             try
             {
                 var directory = new DirectoryInfo(path);
@@ -499,19 +446,16 @@ del ""%~f0""
             }
             catch { }
 
-            // 3. Tenta deletar a pasta recursivamente
             try
             {
                 Directory.Delete(path, true);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                // Se falhar devido a trava de arquivo, espera um momento e tenta de novo
                 System.Threading.Thread.Sleep(1000);
                 try { Directory.Delete(path, true); } 
                 catch 
                 {
-                    // Falha silenciosa final: renomeia para sair do caminho do extrator
                     try 
                     {
                         string tempName = path + "_old_" + Guid.NewGuid().ToString("N").Substring(0, 8);

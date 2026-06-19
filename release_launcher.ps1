@@ -8,32 +8,34 @@ $env:GITHUB_TOKEN = $null
 
 # Fechar instâncias do Launcher ativas para liberar arquivos e evitar erros de permissão
 Write-Host ">>> Fechando instâncias ativas do Launcher para liberar arquivos..." -ForegroundColor Cyan
-Get-Process -Name "OnePieceLauncher" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "OnePieceLauncherWPF" -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
 
-# 1. Obter e opcionalmente atualizar a versão
-Write-Host ">>> Verificando versão atual do Launcher..." -ForegroundColor Cyan
-if (Test-Path "Form1.cs") {
-    $formContent = Get-Content "Form1.cs" -Raw
+# 1. Mudar para o diretório do projeto WPF
+Write-Host ">>> Acessando o diretório do projeto..." -ForegroundColor Cyan
+Set-Location -Path "$PSScriptRoot"
+
+# 2. Ler a versão atual do MainWindow.xaml.cs
+$currentVersion = "0.0.0"
+if (Test-Path "MainWindow.xaml.cs") {
+    $formContent = Get-Content "MainWindow.xaml.cs" -Raw
     if ($formContent -match 'CurrentLauncherVersion = new Version\("([^"]+)"\)') {
         $currentVersion = $Matches[1]
-        Write-Host "Versão atual detectada no Form1.cs: v$currentVersion" -ForegroundColor Green
+        Write-Host "Versão atual detectada no MainWindow.xaml.cs: v$currentVersion" -ForegroundColor Green
         
+        # 3. Perguntar nova versão
         $newVersion = Read-Host "Digite a nova versão (ou aperte Enter para manter v$currentVersion)"
-        if (-not [string]::IsNullOrWhiteSpace($newVersion)) {
-            if ($newVersion.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
-                $newVersion = $newVersion.Substring(1)
-            }
-            # Atualizar Form1.cs com a nova versão
-            $formContent = $formContent -replace 'CurrentLauncherVersion = new Version\("[^"]+"\)', "CurrentLauncherVersion = new Version(`"$newVersion`")"
-            Set-Content "Form1.cs" -Value $formContent -NoNewline
-            $version = $newVersion
-            Write-Host "Versão atualizada no Form1.cs para: v$version" -ForegroundColor Green
-        } else {
+        if ([string]::IsNullOrWhiteSpace($newVersion)) {
             $version = $currentVersion
+        } else {
+            $version = $newVersion
+            # Atualizar o arquivo MainWindow.xaml.cs com a nova versão
+            $formContent = $formContent -replace 'CurrentLauncherVersion = new Version\("([^"]+)"\)', "CurrentLauncherVersion = new Version(`"$version`")"
+            Set-Content -Path "MainWindow.xaml.cs" -Value $formContent
+            Write-Host "Versão atualizada no MainWindow.xaml.cs para v$version" -ForegroundColor Green
         }
     } else {
-        $version = Read-Host "Versão não detectada no Form1.cs. Digite a versão desejada (ex: 1.0.0)"
+        $version = Read-Host "Versão não detectada no MainWindow.xaml.cs. Digite a versão desejada (ex: 1.0.0)"
     }
 } else {
     $version = Read-Host "Arquivo Form1.cs não encontrado. Digite a versão desejada (ex: 1.0.0)"
