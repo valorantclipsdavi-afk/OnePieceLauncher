@@ -23,7 +23,7 @@ namespace OnePieceLauncher
         
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.23");
+        private static readonly Version CurrentLauncherVersion = new Version("0.0.24");
 
         private Label lblStatus;
         private ProgressBar progressBar;
@@ -354,7 +354,35 @@ del ""%~f0""
                     {
                         Directory.CreateDirectory(gameFolderPath);
                     }
-                    ZipFile.ExtractToDirectory(zipFilePath, gameFolderPath, overwriteFiles: true);
+                    
+                    // Extração manual robusta (renomeia arquivos travados)
+                    using (ZipArchive archive = ZipFile.OpenRead(zipFilePath))
+                    {
+                        foreach (ZipArchiveEntry entry in archive.Entries)
+                        {
+                            string destinationPath = Path.GetFullPath(Path.Combine(gameFolderPath, entry.FullName));
+                            if (destinationPath.StartsWith(gameFolderPath, StringComparison.Ordinal))
+                            {
+                                if (string.IsNullOrEmpty(entry.Name))
+                                {
+                                    Directory.CreateDirectory(destinationPath);
+                                }
+                                else
+                                {
+                                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                                    if (File.Exists(destinationPath))
+                                    {
+                                        try { File.Delete(destinationPath); }
+                                        catch 
+                                        { 
+                                            try { File.Move(destinationPath, destinationPath + ".old" + Guid.NewGuid().ToString("N").Substring(0, 4)); } catch { }
+                                        }
+                                    }
+                                    entry.ExtractToFile(destinationPath, true);
+                                }
+                            }
+                        }
+                    }
                 });
 
                 // Deleta o ZIP
