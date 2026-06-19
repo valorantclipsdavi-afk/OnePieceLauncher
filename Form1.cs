@@ -23,7 +23,7 @@ namespace OnePieceLauncher
         
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.24");
+        private static readonly Version CurrentLauncherVersion = new Version("0.0.242");
 
         private Label lblStatus;
         private ProgressBar progressBar;
