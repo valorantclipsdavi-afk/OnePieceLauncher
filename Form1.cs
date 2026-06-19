@@ -23,7 +23,7 @@ namespace OnePieceLauncher
         
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.22");
+        private static readonly Version CurrentLauncherVersion = new Version("0.0.23");
 
         private Label lblStatus;
         private ProgressBar progressBar;
@@ -433,14 +433,26 @@ del ""%~f0""
         {
             if (!Directory.Exists(path)) return;
 
-            // 1. Tenta fechar processos do jogo que possam estar travando os arquivos
+            // 1. Tenta fechar processos do jogo e do Unity Crash Handler que travam as DLLs
             try
             {
-                string processName = Path.GetFileNameWithoutExtension(GameExecutableName);
-                foreach (var process in Process.GetProcessesByName(processName))
+                string[] processesToKill = {
+                    Path.GetFileNameWithoutExtension(GameExecutableName),
+                    "UnityCrashHandler64",
+                    "UnityCrashHandler32"
+                };
+
+                foreach (var procName in processesToKill)
                 {
-                    process.Kill();
-                    process.WaitForExit(2000);
+                    foreach (var process in Process.GetProcessesByName(procName))
+                    {
+                        try 
+                        { 
+                            process.Kill(); 
+                            process.WaitForExit(2000); 
+                        } 
+                        catch { }
+                    }
                 }
             }
             catch { }
