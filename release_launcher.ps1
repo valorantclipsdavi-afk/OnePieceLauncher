@@ -103,6 +103,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "`n>>> Sucesso! A versão v$version do Launcher foi publicada no repositório com sucesso!" -ForegroundColor Green
 }
 
+# 6.5. Atualizar o executável local
+Write-Host "`n>>> Atualizando o seu executável local..." -ForegroundColor Cyan
+Copy-Item -Path "$publishFolder\*" -Destination (Get-Location) -Force
+Write-Host "Executável atualizado com sucesso no seu PC." -ForegroundColor Green
+
 # 7. Limpar arquivos temporários
 Write-Host "`n>>> Limpando arquivos temporários..." -ForegroundColor Cyan
 if (Test-Path $publishFolder) {

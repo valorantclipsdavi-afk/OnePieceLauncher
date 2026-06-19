@@ -23,7 +23,7 @@ namespace OnePieceLauncher
         
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.242");
+        private static readonly Version CurrentLauncherVersion = new Version("0.0.243");
 
         private Label lblStatus;
         private ProgressBar progressBar;
@@ -280,8 +280,11 @@ namespace OnePieceLauncher
                 string exeName = Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName);
 
                 string batchContent = $@"@echo off
-timeout /t 2 /nobreak > nul
+:wait
+taskkill /f /im ""{exeName}"" > nul 2>&1
+timeout /t 1 /nobreak > nul
 xcopy ""launcher_temp"" ""."" /y /e /s /i /q > nul
+if errorlevel 1 goto wait
 rmdir /s /q ""launcher_temp"" > nul
 if exist ""launcher_update.zip"" del /f /q ""launcher_update.zip"" > nul
 start """" ""{exeName}""
