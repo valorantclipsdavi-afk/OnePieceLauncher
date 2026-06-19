@@ -23,7 +23,7 @@ namespace OnePieceLauncher
         
         // ==========================================
 
-        private static readonly Version CurrentLauncherVersion = new Version("0.0.2");
+        private static readonly Version CurrentLauncherVersion = new Version("0.0.22");
 
         private Label lblStatus;
         private ProgressBar progressBar;
@@ -35,6 +35,9 @@ namespace OnePieceLauncher
         private string versionFilePath;
         private string zipFilePath;
         private string gameExecutablePath;
+        private string usernameFilePath;
+        
+        private TextBox txtUsername;
 
         public Form1()
         {
@@ -51,6 +54,7 @@ namespace OnePieceLauncher
             versionFilePath = Path.Combine(baseFolder, "versao.txt");
             zipFilePath = Path.Combine(baseFolder, "update.zip");
             gameExecutablePath = Path.Combine(gameFolderPath, GameExecutableName);
+            usernameFilePath = Path.Combine(baseFolder, "username.txt");
 
             // Tenta deletar atualizador antigo se existir
             string oldBatch = Path.Combine(baseFolder, "update_launcher.bat");
@@ -83,10 +87,30 @@ namespace OnePieceLauncher
                 Style = ProgressBarStyle.Continuous
             };
 
+            Label lblUser = new Label
+            {
+                Text = "Nome:",
+                Location = new Point(20, 118),
+                AutoSize = true,
+                Font = new Font("Arial", 10, FontStyle.Regular)
+            };
+
+            txtUsername = new TextBox
+            {
+                Location = new Point(70, 115),
+                Size = new Size(130, 25),
+                Font = new Font("Arial", 10, FontStyle.Regular)
+            };
+
+            if (File.Exists(usernameFilePath))
+            {
+                txtUsername.Text = File.ReadAllText(usernameFilePath).Trim();
+            }
+
             btnPlay = new Button
             {
                 Text = "Jogar",
-                Location = new Point(140, 110),
+                Location = new Point(210, 110),
                 Size = new Size(100, 35),
                 Enabled = false,
                 Font = new Font("Arial", 10, FontStyle.Bold)
@@ -95,6 +119,8 @@ namespace OnePieceLauncher
 
             this.Controls.Add(lblStatus);
             this.Controls.Add(progressBar);
+            this.Controls.Add(lblUser);
+            this.Controls.Add(txtUsername);
             this.Controls.Add(btnPlay);
         }
 
@@ -294,6 +320,11 @@ del ""%~f0""
 
                     long? totalBytes = response.Content.Headers.ContentLength;
 
+                    if (File.Exists(zipFilePath))
+                    {
+                        File.SetAttributes(zipFilePath, FileAttributes.Normal);
+                    }
+
                     using (Stream contentStream = await response.Content.ReadAsStreamAsync())
                     using (FileStream fileStream = new FileStream(zipFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                     {
@@ -319,8 +350,11 @@ del ""%~f0""
                 await Task.Run(() =>
                 {
                     SafeDeleteDirectory(gameFolderPath);
-                    Directory.CreateDirectory(gameFolderPath);
-                    ZipFile.ExtractToDirectory(zipFilePath, gameFolderPath);
+                    if (!Directory.Exists(gameFolderPath))
+                    {
+                        Directory.CreateDirectory(gameFolderPath);
+                    }
+                    ZipFile.ExtractToDirectory(zipFilePath, gameFolderPath, overwriteFiles: true);
                 });
 
                 // Deleta o ZIP
@@ -351,11 +385,22 @@ del ""%~f0""
 
         private void BtnPlay_Click(object sender, EventArgs e)
         {
+            string username = txtUsername.Text.Trim();
+            if (string.IsNullOrEmpty(username))
+            {
+                username = "Pirata_" + new Random().Next(1000, 9999);
+                txtUsername.Text = username;
+            }
+            File.WriteAllText(usernameFilePath, username);
+
+            string args = $"-username \"{username}\"";
+
             if (File.Exists(gameExecutablePath))
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = gameExecutablePath,
+                    Arguments = args,
                     WorkingDirectory = gameFolderPath,
                     UseShellExecute = true
                 });
@@ -371,6 +416,7 @@ del ""%~f0""
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = actualExePath,
+                        Arguments = args,
                         WorkingDirectory = Path.GetDirectoryName(actualExePath),
                         UseShellExecute = true
                     });
@@ -415,11 +461,21 @@ del ""%~f0""
             {
                 Directory.Delete(path, true);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 // Se falhar devido a trava de arquivo, espera um momento e tenta de novo
                 System.Threading.Thread.Sleep(1000);
-                try { Directory.Delete(path, true); } catch { }
+                try { Directory.Delete(path, true); } 
+                catch 
+                {
+                    // Falha silenciosa final: renomeia para sair do caminho do extrator
+                    try 
+                    {
+                        string tempName = path + "_old_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                        Directory.Move(path, tempName);
+                    }
+                    catch { }
+                }
             }
         }
     }
